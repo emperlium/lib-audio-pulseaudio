@@ -18,6 +18,8 @@ On Ubuntu distributions;
 
 ## Example
 
+Playing audio;
+
     use Nick::Audio::PulseAudio;
     use Time::HiRes 'sleep';
 
@@ -58,6 +60,37 @@ On Ubuntu distributions;
     }
     $pulse -> flush();
 
+Recording audio;
+
+    use Nick::Audio::PulseAudio;
+    use Nick::Audio::Wav::Write '$WAV_BUFFER';
+
+    my $sample_rate = 44100;
+    my $channels = 2;
+
+    my $buffer;
+    my $pulse = Nick::Audio::PulseAudio -> new(
+        'sample_rate'   => $sample_rate,
+        'channels'      => $channels,
+        'buffer_in'     => \$WAV_BUFFER,
+        'name'          => 'RecTest',
+        'read_secs'     => .1
+    );
+
+    my $wav = Nick::Audio::Wav::Write -> new(
+        '/tmp/test.wav',
+        'channels' => $channels,
+        'sample_rate' => $sample_rate,
+        'bits_sample' => 16
+    );
+
+    my $i = 0;
+    while ( $i++ < 100  ) {
+        $pulse -> read();
+        $wav -> write();
+    }
+    $wav -> close();
+
 ## Methods
 
 ### new()
@@ -88,7 +121,7 @@ Arguments are interpreted as a hash and all are optional.
 
 - buffer\_in
 
-    Scalar that'll be used to pull PCM data from.
+    Scalar that'll be used to pull/ push PCM data from/ to.
 
 - buffer\_secs
 
@@ -122,6 +155,12 @@ Arguments are interpreted as a hash and all are optional.
 
     If unset, the default volume will be set.
 
+- read\_secs
+
+    Greater than 0 if we'll be recording audio, and how many seconds of audio is read each time **read()** is called.
+
+    Default: **unset**
+
 ### play()
 
 Sends PCM audio data from **buffer\_in** to PulseAudio.
@@ -146,4 +185,10 @@ Returns the number of bytes that can be written to PulseAudio.
 
 Volume the client should be play at.
 
-Value should be a percentage integer,
+Value should be a percentage integer.
+
+### read()
+
+Reads **read\_secs** seconds of PCM audio data from PulseAudio into **buffer\_in**.
+
+Blocks until audio is retrieved to the server.

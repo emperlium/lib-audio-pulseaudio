@@ -31,7 +31,7 @@ typedef struct nickaudiopulseaudio NICKAUDIOPULSEAUDIO;
 MODULE = Nick::Audio::PulseAudio  PACKAGE = Nick::Audio::PulseAudio
 
 static NICKAUDIOPULSEAUDIO *
-NICKAUDIOPULSEAUDIO::new_xs( sample_rate, channels, scalar_in, buffer_secs, device, server, name, app )
+NICKAUDIOPULSEAUDIO::new_xs( sample_rate, channels, scalar_in, buffer_secs, device, server, name, app, record )
         int sample_rate;
         int channels;
         SV *scalar_in;
@@ -40,6 +40,7 @@ NICKAUDIOPULSEAUDIO::new_xs( sample_rate, channels, scalar_in, buffer_secs, devi
         const char *server;
         const char *name;
         const char *app;
+        bool record;
     CODE:
         pa_sample_spec ss;
         ss.format = PA_SAMPLE_S16LE;
@@ -62,7 +63,7 @@ NICKAUDIOPULSEAUDIO::new_xs( sample_rate, channels, scalar_in, buffer_secs, devi
         RETVAL -> pa = pa_simple_new(
             *server == 0 ? NULL : server,
             name,
-            PA_STREAM_PLAYBACK,
+            record ? PA_STREAM_RECORD : PA_STREAM_PLAYBACK,
             *device == 0 ? NULL : device,
             app,
             &ss,
@@ -203,3 +204,20 @@ NICKAUDIOPULSEAUDIO::can_write()
         RETVAL = pa_stream_writable_size( THIS -> pa -> stream );
     OUTPUT:
         RETVAL
+
+void
+NICKAUDIOPULSEAUDIO::read()
+    CODE:
+        STRLEN len_in;
+        short int *in_buff = (short int*)SvPV( THIS -> scalar_in, len_in );
+        int error;
+        if (
+            pa_simple_read(
+                THIS -> pa,
+                in_buff,
+                len_in,
+                &error
+            ) < 0
+        ) {
+            croak( "PulseAudio read failed: %s", pa_strerror( error ) );
+        }

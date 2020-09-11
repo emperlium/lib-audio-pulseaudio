@@ -31,6 +31,8 @@ Nick::Audio::PulseAudio - Interface to the pulse-simple library.
 
 =head1 SYNOPSIS
 
+Playing audio;
+
     use Nick::Audio::PulseAudio;
     use Time::HiRes 'sleep';
 
@@ -71,6 +73,37 @@ Nick::Audio::PulseAudio - Interface to the pulse-simple library.
     }
     $pulse -> flush();
 
+Recording audio;
+
+    use Nick::Audio::PulseAudio;
+    use Nick::Audio::Wav::Write '$WAV_BUFFER';
+
+    my $sample_rate = 44100;
+    my $channels = 2;
+
+    my $buffer;
+    my $pulse = Nick::Audio::PulseAudio -> new(
+        'sample_rate'   => $sample_rate,
+        'channels'      => $channels,
+        'buffer_in'     => \$WAV_BUFFER,
+        'name'          => 'RecTest',
+        'read_secs'     => .1
+    );
+
+    my $wav = Nick::Audio::Wav::Write -> new(
+        '/tmp/test.wav',
+        'channels' => $channels,
+        'sample_rate' => $sample_rate,
+        'bits_sample' => 16
+    );
+
+    my $i = 0;
+    while ( $i++ < 100  ) {
+        $pulse -> read();
+        $wav -> write();
+    }
+    $wav -> close();
+
 =head1 METHODS
 
 =head2 new()
@@ -103,7 +136,7 @@ Default: B<2>
 
 =item buffer_in
 
-Scalar that'll be used to pull PCM data from.
+Scalar that'll be used to pull/ push PCM data from/ to.
 
 =item buffer_secs
 
@@ -137,6 +170,12 @@ Value should be a percentage integer,
 
 If unset, the default volume will be set.
 
+=item read_secs
+
+Greater than 0 if we'll be recording audio, and how many seconds of audio is read each time B<read()> is called.
+
+Default: B<unset>
+
 =back
 
 =head2 play()
@@ -165,11 +204,17 @@ Volume the client should be play at.
 
 Value should be a percentage integer,
 
+=head2 read()
+
+Reads B<read_secs> seconds of PCM audio data from PulseAudio into B<buffer_in>.
+
+Blocks until audio is retrieved to the server.
+
 =cut
 
 sub new {
     my( $class, %settings ) = @_;
-    my $self = Nick::Audio::PulseAudio -> new_xs( map
+    my @set = map(
         exists( $settings{$_} )
         ? $settings{$_}
         : $DEFAULTS{$_},
@@ -178,6 +223,20 @@ sub new {
             device server name app
         )
     );
+    if (
+        exists( $settings{'read_secs'} )
+        && $settings{'read_secs'} > 0
+    ) {
+        my $bytes = $settings{'read_secs'}
+                    * $settings{'sample_rate'}
+                    * $settings{'channels'}
+                    * 2;
+        ${ $settings{'buffer_in'} } = pack 'c' . $bytes, 0;
+        push @set => 1;
+    } else {
+        push @set => 0;
+    }
+    my $self = Nick::Audio::PulseAudio -> new_xs( @set );
     exists( $settings{'volume'} )
         && $settings{'volume'}
             and $self -> set_volume_xs( $settings{'volume'} );

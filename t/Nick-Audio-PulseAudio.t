@@ -12,7 +12,7 @@ my $hz = 441;
 my $duration = 2;
 
 my $buff_in;
-my $pulse = Nick::Audio::PulseAudio -> new(
+my %set = (
     'sample_rate'   => $sample_rate,
     'channels'      => 1,
     'buffer_in'     => \$buff_in,
@@ -20,6 +20,8 @@ my $pulse = Nick::Audio::PulseAudio -> new(
     'name'          => 'NickAudioTest',
     'volume'        => 75
 );
+
+my $pulse = Nick::Audio::PulseAudio -> new( %set );
 
 ok( defined( $pulse ), 'new()' );
 
@@ -45,3 +47,9 @@ for ( $i = 0; $i < $steps; $i++ ) {
     $pulse -> play_nb();
 }
 $pulse -> flush();
+
+$set{'read_secs'} = .1;
+$pulse = Nick::Audio::PulseAudio -> new( %set );
+for ( my $i = 0; $i < 5; $i++ ) {
+    $pulse -> read();
+}
